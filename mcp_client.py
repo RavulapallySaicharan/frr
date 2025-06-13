@@ -4,20 +4,34 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from contextlib import AsyncExitStack
 from typing import Any, Dict, List, Optional, cast
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 import json
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class MCPClient:
     def __init__(self) -> None:
         # Initialize session and client objects
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
+        
+        # Try Azure OpenAI first
+        try:
+            self.client = AzureOpenAI(
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            )
+            self.is_azure = True
+        except Exception:
+            # Fallback to regular OpenAI
+            self.client = OpenAI(
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
+            self.is_azure = False
+            
         self.stdio = None
         self.write = None
 
@@ -74,46 +88,9 @@ class MCPClient:
             for tool in response.tools
         ]
 
-        # Initial Azure OpenAI API call
-        response = self.client.chat.completions.create(
-            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
-            messages=messages,
-            tools=available_tools,
-            tool_choice="auto"
-        )
-
-        # Process response and handle tool calls
-        tool_results = []
-        final_text = []
-
-        while True:
-            message = response.choices[0].message
-            
-            # Add assistant's message to the conversation
-            messages.append({"role": "assistant", "content": message.content or ""})
-            
-            if message.content:
-                final_text.append(message.content)
-
-            # Check if there are any tool calls
-            if message.tool_calls:
-                for tool_call in message.tool_calls:
-                    tool_name = tool_call.function.name
-                    tool_args = json.loads(tool_call.function.arguments)
-
-                    # Execute tool call
-                    result = await self.session.call_tool(tool_name, tool_args)
-                    tool_results.append({"call": tool_name, "result": result})
-                    final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
-
-                    # Add tool response to messages
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result.content
-                    })
-
-                # Get next response from Azure OpenAI
+        try:
+            # Initial API call
+            if self.is_azure:
                 response = self.client.chat.completions.create(
                     model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
                     messages=messages,
@@ -121,9 +98,74 @@ class MCPClient:
                     tool_choice="auto"
                 )
             else:
-                break
+                response = self.client.chat.completions.create(
+                    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                    messages=messages,
+                    tools=available_tools,
+                    tool_choice="auto"
+                )
 
-        return "\n".join(final_text)
+            # Process response and handle tool calls
+            tool_results = []
+            final_text = []
+
+            while True:
+                message = response.choices[0].message
+                
+                # Add assistant's message to the conversation
+                messages.append({"role": "assistant", "content": message.content or ""})
+                
+                if message.content:
+                    final_text.append(message.content)
+
+                # Check if there are any tool calls
+                if message.tool_calls:
+                    for tool_call in message.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_args = json.loads(tool_call.function.arguments)
+
+                        # Execute tool call
+                        result = await self.session.call_tool(tool_name, tool_args)
+                        tool_results.append({"call": tool_name, "result": result})
+                        final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
+
+                        # Add tool response to messages
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": result.content
+                        })
+
+                    # Get next response
+                    if self.is_azure:
+                        response = self.client.chat.completions.create(
+                            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+                            messages=messages,
+                            tools=available_tools,
+                            tool_choice="auto"
+                        )
+                    else:
+                        response = self.client.chat.completions.create(
+                            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                            messages=messages,
+                            tools=available_tools,
+                            tool_choice="auto"
+                        )
+                else:
+                    break
+
+            return "\n".join(final_text)
+            
+        except Exception as e:
+            if self.is_azure:
+                print("Azure OpenAI failed, switching to regular OpenAI...")
+                self.client = OpenAI(
+                    api_key=os.getenv("OPENAI_API_KEY")
+                )
+                self.is_azure = False
+                return await self.process_query(query)  # Retry with regular OpenAI
+            else:
+                raise e  # If regular OpenAI also fails, raise the error
 
     async def chat_loop(self) -> None:
         """Run an interactive chat loop"""
