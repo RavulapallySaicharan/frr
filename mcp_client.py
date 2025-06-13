@@ -7,7 +7,11 @@ from typing import Any, Dict, List, Optional, cast
 from openai import AzureOpenAI, OpenAI
 import json
 import os
+import logging
 from dotenv import load_dotenv
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -16,6 +20,7 @@ class MCPClient:
         # Initialize session and client objects
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
+        self._tools: Optional[List[Dict[str, Any]]] = None
         
         # Try Azure OpenAI first
         try:
@@ -34,6 +39,106 @@ class MCPClient:
             
         self.stdio = None
         self.write = None
+
+    async def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """Send a request to the MCP server.
+        
+        Args:
+            method: The method to call (e.g., "tools/list", "tools/call")
+            params: Optional parameters for the method
+            
+        Returns:
+            The response from the server
+            
+        Raises:
+            Exception: If the request fails
+        """
+        if not self.session:
+            raise RuntimeError("Not connected to server. Call connect_to_server first.")
+
+        request = {
+            "method": method,
+            "params": params or {}
+        }
+        
+        # Log the request being sent
+        logger.info(f"Sending request to server: {json.dumps(request, indent=2)}")
+        
+        try:
+            if method == "tools/list":
+                response = await self.session.list_tools()
+                return {"tools": [{"name": tool.name, "description": tool.description, "inputSchema": tool.inputSchema} for tool in response.tools]}
+            elif method == "tools/call":
+                if not params or "name" not in params or "arguments" not in params:
+                    raise ValueError("Missing required parameters for tool call")
+                result = await self.session.call_tool(params["name"], params["arguments"])
+                return {"content": [{"type": "text", "text": result.content}]}
+            else:
+                raise ValueError(f"Unknown method: {method}")
+        except Exception as e:
+            logger.error(f"Request failed: {str(e)}")
+            raise
+
+    async def list_tools(self) -> List[Dict[str, Any]]:
+        """Get list of available tools from the server.
+        
+        Returns:
+            List of tool definitions
+        """
+        if self._tools is None:
+            response = await self._send_request("tools/list")
+            self._tools = response.get("tools", [])
+        return self._tools
+
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
+        """Call a tool through the server.
+        
+        Args:
+            name: Name of the tool to call
+            arguments: Arguments to pass to the tool
+            
+        Returns:
+            The tool's response
+            
+        Raises:
+            Exception: If the tool call fails
+        """
+        # Log the incoming arguments
+        logger.info(f"call_tool received arguments: {json.dumps(arguments, indent=2)}")
+        
+        # If arguments is a string, try to parse it as JSON
+        if isinstance(arguments, str):
+            try:
+                arguments = json.loads(arguments)
+                logger.info(f"Parsed string arguments into: {json.dumps(arguments, indent=2)}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse arguments string: {e}")
+                raise
+        
+        # Ensure arguments is a dictionary
+        if not isinstance(arguments, dict):
+            logger.error(f"Arguments must be a dictionary, got {type(arguments)}")
+            raise TypeError("Arguments must be a dictionary")
+        
+        params = {
+            "name": name,
+            "arguments": arguments
+        }
+        
+        # Log the actual parameters being sent
+        logger.info(f"Sending parameters to server: {json.dumps(params, indent=2)}")
+        
+        response = await self._send_request("tools/call", params)
+        
+        # Extract text content from response
+        if isinstance(response, dict):
+            content = response.get("content", [])
+            if content and isinstance(content, list):
+                first_content = content[0]
+                if isinstance(first_content, dict) and first_content.get("type") == "text":
+                    return first_content.get("text")
+        
+        return response
 
     async def connect_to_server(self, server_script_path: str) -> None:
         """Connect to an MCP server
