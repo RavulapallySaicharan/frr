@@ -232,6 +232,23 @@ async def test_frr_mcp_tools():
         response = await client.process_query("Search for financial performance in doc1")
         print(response)
         
+        # Test get_data
+        print("\nTesting get_data...")
+        # Test case 1: Get all data for a specific client
+        response = await client.process_query("Get all data for client1")
+        print("\nClient1 data:")
+        print(response)
+        
+        # Test case 2: Get data for a specific document and section
+        response = await client.process_query("Get SOI data for doc1")
+        print("\nDoc1 SOI data:")
+        print(response)
+        
+        # Test case 3: Get all SOL data
+        response = await client.process_query("Get all SOL data")
+        print("\nAll SOL data:")
+        print(response)
+        
         # Test error handling
         print("\nTesting error handling...")
         response = await client.process_query("Get the table from non_existent_doc")

@@ -8,6 +8,7 @@ import requests
 from mcp.server.fastmcp import FastMCP
 import os
 from dotenv import load_dotenv
+import pandas as pd
 
 # Initialize FastMCP server
 mcp = FastMCP("frr_mcp")
@@ -211,6 +212,47 @@ async def get_semantic_search(
         "passages": all_passages[:top_k],
         "scores": [0.9] * min(top_k, len(all_passages))
     }
+
+@mcp.tool()
+async def get_data(
+    client_id: Optional[str] = None,
+    document_id: Optional[str] = None,
+    section: Optional[str] = None
+) -> Dict:
+    """Get data from the sample CSV file based on filters.
+    
+    Args:
+        client_id: Optional client identifier to filter by
+        document_id: Optional document identifier to filter by
+        section: Optional section name to filter by (e.g., SOI, SOL)
+    
+    Returns:
+        Dictionary containing the filtered data
+    """
+    logger.info(f"Getting data for client: {client_id}, document: {document_id}, section: {section}")
+    
+    try:
+        # Read the CSV file
+        df = pd.read_csv('sample_data.csv')
+        
+        # Apply filters if provided
+        if client_id:
+            df = df[df['client'] == client_id]
+        if document_id:
+            df = df[df['document'] == document_id]
+        if section:
+            df = df[df['section'] == section]
+        
+        # Convert to dictionary format
+        result = df.to_dict(orient='records')
+        
+        return {
+            "data": result,
+            "count": len(result)
+        }
+    except Exception as e:
+        logger.error(f"Error reading data: {str(e)}")
+        raise ValueError(f"Error reading data: {str(e)}")
 
 def main():
     """Entry point for the FRR MCP server."""

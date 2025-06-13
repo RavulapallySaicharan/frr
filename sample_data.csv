@@ -1,0 +1,9 @@
+client,document,section,information
+client1,doc1,SOI,"Income: $100,000, Assets: $500,000, Liabilities: $200,000"
+client1,doc1,SOL,"Liquidity Ratio: 2.5, Debt Ratio: 0.4, Coverage Ratio: 3.2"
+client1,doc2,SOI,"Income: $150,000, Assets: $750,000, Liabilities: $300,000"
+client1,doc2,SOL,"Liquidity Ratio: 2.8, Debt Ratio: 0.35, Coverage Ratio: 3.5"
+client2,doc3,SOI,"Income: $200,000, Assets: $1,000,000, Liabilities: $400,000"
+client2,doc3,SOL,"Liquidity Ratio: 3.0, Debt Ratio: 0.3, Coverage Ratio: 4.0"
+client2,doc4,SOI,"Income: $180,000, Assets: $900,000, Liabilities: $350,000"
+client2,doc4,SOL,"Liquidity Ratio: 2.9, Debt Ratio: 0.32, Coverage Ratio: 3.8" 
