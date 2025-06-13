@@ -99,7 +99,7 @@ class MCPClient:
                 )
             else:
                 response = self.client.chat.completions.create(
-                    model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                    model=os.getenv("OPENAI_MODEL", "gpt-4"),
                     messages=messages,
                     tools=available_tools,
                     tool_choice="auto"
@@ -113,13 +113,29 @@ class MCPClient:
                 message = response.choices[0].message
                 
                 # Add assistant's message to the conversation
-                messages.append({"role": "assistant", "content": message.content or ""})
-                
                 if message.content:
+                    messages.append({"role": "assistant", "content": message.content})
                     final_text.append(message.content)
 
                 # Check if there are any tool calls
                 if message.tool_calls:
+                    # Add the assistant's message with tool calls
+                    messages.append({
+                        "role": "assistant",
+                        "content": message.content,
+                        "tool_calls": [
+                            {
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments
+                                }
+                            }
+                            for tool_call in message.tool_calls
+                        ]
+                    })
+
                     for tool_call in message.tool_calls:
                         tool_name = tool_call.function.name
                         tool_args = json.loads(tool_call.function.arguments)
@@ -146,7 +162,7 @@ class MCPClient:
                         )
                     else:
                         response = self.client.chat.completions.create(
-                            model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+                            model=os.getenv("OPENAI_MODEL", "gpt-4"),
                             messages=messages,
                             tools=available_tools,
                             tool_choice="auto"
