@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import pandas as pd
 
 # Initialize FastMCP server
-mcp = FastMCP("frr_mcp")
+mcp = FastMCP("frr_mcp_2")
 
 # Configure logging
 logging.basicConfig(
@@ -81,89 +81,6 @@ DUMMY_DOCUMENTS = {
         }
     }
 }
-
-class PromptHub:
-    """Mock Prompt Hub for demonstration."""
-    def __init__(self, base_url: str = "http://prompt-hub.example.com"):
-        self.base_url = base_url
-        self.cache = {}
-    
-    def get_prompt(self, section: str) -> str:
-        """Get prompt for a section, with caching."""
-        # Check cache first
-        if section in self.cache:
-            return self.cache[section]
-        
-        # Mock API call
-        # In real implementation, this would be:
-        # response = requests.get(f"{self.base_url}/prompts/{section}")
-        # return response.json()["prompt"]
-        
-        # Dummy prompts for testing
-        prompts = {
-            "Financial Summary": "Extract all financial metrics and their values",
-            "Executive Summary": "Summarize the key points and recommendations",
-            "default": "Extract all relevant information from this section"
-        }
-        
-        prompt = prompts.get(section, prompts["default"])
-        self.cache[section] = prompt
-        return prompt
-
-# Initialize Prompt Hub
-prompt_hub = PromptHub()
-
-@mcp.tool()
-async def get_table(
-    doc_id: str,
-    section: Optional[str] = None
-) -> Dict:
-    """Extract tabular sections from the parsed PDF content.
-    
-    Args:
-        doc_id: Document identifier
-        section: Optional section name to filter by
-    
-    Returns:
-        Dictionary containing the extracted table data
-    """
-    logger.info(f"Getting table for doc_id: {doc_id}, section: {section}")
-    
-    # In real implementation, this would query the database
-    # For now, use dummy data
-    if doc_id not in DUMMY_DOCUMENTS:
-        raise ValueError(f"Document {doc_id} not found")
-    
-    doc = DUMMY_DOCUMENTS[doc_id]
-    sections = doc["sections"]
-    
-    if section:
-        if section not in sections:
-            raise ValueError(f"Section {section} not found in document {doc_id}")
-        if sections[section]["type"] != "table":
-            raise ValueError(f"Section {section} is not a table")
-        return {"table": sections[section]["content"]}
-    
-    # Return all tables if no section specified
-    tables = {
-        name: data["content"]
-        for name, data in sections.items()
-        if data["type"] == "table"
-    }
-    return {"tables": tables}
-
-@mcp.tool()
-async def get_prompt(section: str) -> str:
-    """Fetch extraction prompt for the given section.
-    
-    Args:
-        section: Section name to get prompt for
-    
-    Returns:
-        The prompt text for the section
-    """
-    logger.info(f"Getting prompt for section: {section}")
-    return prompt_hub.get_prompt(section)
 
 @mcp.tool()
 async def get_semantic_search(
@@ -255,16 +172,16 @@ async def get_data(
         raise ValueError(f"Error reading data: {str(e)}")
 
 def main():
-    """Entry point for the FRR MCP server."""
+    """Entry point for the FRR MCP server 2."""
     # Load environment variables
     load_dotenv()
     
     # Initialize database
     init_db()
     
-    # Start MCP server
-    logger.info("Starting FRR MCP server")
-    mcp.run(transport='stdio')
+    # Start MCP server with streamable-http transport on port 8002
+    logger.info("Starting FRR MCP server 2 on port 8002")
+    mcp.run(transport='streamable-http', port=8002)
 
 if __name__ == "__main__":
     main() 

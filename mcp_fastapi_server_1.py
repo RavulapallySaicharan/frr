@@ -5,13 +5,11 @@ import json
 import logging
 from datetime import datetime
 import requests
-from fastmcp import FastMCP
+from fastapi import FastAPI
+from fastapi_mcp import FastApiMCP
 import os
 from dotenv import load_dotenv
 import pandas as pd
-
-# Initialize FastMCP server
-mcp = FastMCP("frr_mcp")
 
 # Configure logging
 logging.basicConfig(
@@ -19,6 +17,18 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Your API app
+api_app = FastAPI(title="FRR API", description="Financial Report Reader API")
+
+# A separate app for the MCP server
+mcp_app = FastAPI()
+
+# Create MCP server from the API app
+mcp = FastApiMCP(api_app)
+
+# Mount the MCP server to the separate app
+mcp.mount(mcp_app)
 
 # Database setup
 def init_db():
@@ -113,7 +123,30 @@ class PromptHub:
 # Initialize Prompt Hub
 prompt_hub = PromptHub()
 
-@mcp.tool()
+# API Endpoints
+@api_app.get("/")
+async def root():
+    """Root endpoint for the FRR API."""
+    return {"message": "Financial Report Reader API is running"}
+
+@api_app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@api_app.get("/documents")
+async def list_documents():
+    """List all available documents."""
+    return {"documents": list(DUMMY_DOCUMENTS.keys())}
+
+@api_app.get("/documents/{doc_id}")
+async def get_document(doc_id: str):
+    """Get document metadata by ID."""
+    if doc_id not in DUMMY_DOCUMENTS:
+        raise ValueError(f"Document {doc_id} not found")
+    return {"document": DUMMY_DOCUMENTS[doc_id]}
+
+@api_app.get("/documents/{doc_id}/tables")
 async def get_table(
     doc_id: str,
     section: Optional[str] = None
@@ -152,7 +185,7 @@ async def get_table(
     }
     return {"tables": tables}
 
-@mcp.tool()
+@api_app.get("/prompts/{section}")
 async def get_prompt(section: str) -> str:
     """Fetch extraction prompt for the given section.
     
@@ -163,108 +196,22 @@ async def get_prompt(section: str) -> str:
         The prompt text for the section
     """
     logger.info(f"Getting prompt for section: {section}")
-    return prompt_hub.get_prompt(section)
-
-@mcp.tool()
-async def get_semantic_search(
-    doc_id: str,
-    section: Optional[str] = None,
-    top_k: int = 5,
-    retriever: str = "default"
-) -> Dict:
-    """Perform semantic similarity search on document content.
-    
-    Args:
-        doc_id: Document identifier
-        section: Optional section name to filter by
-        top_k: Number of top results to return
-        retriever: Retriever type to use
-    
-    Returns:
-        Dictionary containing the top k matching passages
-    """
-    logger.info(f"Performing semantic search for doc_id: {doc_id}, section: {section}")
-    
-    # In real implementation, this would use a proper semantic search engine
-    # For now, return dummy results
-    if doc_id not in DUMMY_DOCUMENTS:
-        raise ValueError(f"Document {doc_id} not found")
-    
-    doc = DUMMY_DOCUMENTS[doc_id]
-    sections = doc["sections"]
-    
-    if section:
-        if section not in sections:
-            raise ValueError(f"Section {section} not found in document {doc_id}")
-        content = sections[section]["content"]
-        return {
-            "passages": [content[:100] + "..."] * top_k,
-            "scores": [0.9] * top_k
-        }
-    
-    # Return results from all sections if no section specified
-    all_passages = []
-    for name, data in sections.items():
-        if isinstance(data["content"], str):
-            all_passages.append(data["content"][:100] + "...")
-    
-    return {
-        "passages": all_passages[:top_k],
-        "scores": [0.9] * min(top_k, len(all_passages))
-    }
-
-@mcp.tool()
-async def get_data(
-    client_id: Optional[str] = None,
-    document_id: Optional[str] = None,
-    section: Optional[str] = None
-) -> Dict:
-    """Get data from the sample CSV file based on filters.
-    
-    Args:
-        client_id: Optional client identifier to filter by
-        document_id: Optional document identifier to filter by
-        section: Optional section name to filter by (e.g., SOI, SOL)
-    
-    Returns:
-        Dictionary containing the filtered data
-    """
-    logger.info(f"Getting data for client: {client_id}, document: {document_id}, section: {section}")
-    
-    try:
-        # Read the CSV file
-        df = pd.read_csv('sample_data.csv')
-        
-        # Apply filters if provided
-        if client_id:
-            df = df[df['client'] == client_id]
-        if document_id:
-            df = df[df['document'] == document_id]
-        if section:
-            df = df[df['section'] == section]
-        
-        # Convert to dictionary format
-        result = df.to_dict(orient='records')
-        
-        return {
-            "data": result,
-            "count": len(result)
-        }
-    except Exception as e:
-        logger.error(f"Error reading data: {str(e)}")
-        raise ValueError(f"Error reading data: {str(e)}")
+    return {"section": section, "prompt": prompt_hub.get_prompt(section)}
 
 def main():
-    """Entry point for the FRR MCP server."""
+    """Entry point for the FRR FastAPI server."""
     # Load environment variables
     load_dotenv()
     
     # Initialize database
     init_db()
     
-    # Start MCP server
-    logger.info("Starting FRR MCP server")
-    mcp.run(transport='stdio')
+    # Start FastAPI server with uvicorn
+    import uvicorn
+    logger.info("Starting FRR FastAPI server on port 8001")
+    uvicorn.run(api_app, host="0.0.0.0", port=8001)
+    logger.info("Starting FRR FastAPI MCP server on port 8000")
+    uvicorn.run(mcp_app, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":
     main() 
