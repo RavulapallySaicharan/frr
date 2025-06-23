@@ -175,7 +175,7 @@ def main():
     
     # Start MCP server with streamable-http transport on port 8001
     logger.info("Starting FRR MCP server 1 on port 8001")
-    mcp.run(transport='streamable-http', port=8001)
+    mcp.run(transport='streamable-http', port=8001, host='0.0.0.0')
 
 if __name__ == "__main__":
     main() 
