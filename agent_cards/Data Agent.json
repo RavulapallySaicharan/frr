@@ -1,0 +1,30 @@
+{
+  "capabilities": {
+    "pushNotifications": false,
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "description": "Agent that provides tabular data.",
+  "name": "Data Agent",
+  "skills": [
+    {
+      "description": "Fetches and returns tabular data.",
+      "examples": [
+        "Get the data table"
+      ],
+      "id": "get_data",
+      "name": "Data Fetcher",
+      "tags": [
+        "data",
+        "table"
+      ]
+    }
+  ],
+  "url": "http://127.0.0.1:9999/",
+  "version": "1.0.0"
+}

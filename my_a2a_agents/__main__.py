@@ -1,36 +1,52 @@
 import uvicorn
-from a2a.server import A2AStarletteApplication, DefaultA2ARequestHandler, InMemoryTaskStore
-from a2a.protocol import AgentSkill
-from data_agent import DataAgentExecutor, get_agent_card as get_data_agent_card, skill as data_skill
-from problem_solver_agent import ProblemSolverAgentExecutor, get_agent_card as get_problem_solver_agent_card, skill as solver_skill
+import httpx
+import threading
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore, InMemoryPushNotifier
+# from a2a.protocol import AgentSkill
+from .data_agent import DataAgentExecutor, get_agent_card as get_data_agent_card, skill as data_skill
+from .problem_solver_agent import ProblemSolverAgentExecutor, get_agent_card as get_problem_solver_agent_card, skill as solver_skill
 
 import os
 
-HOST = os.environ.get("A2A_HOST", "0.0.0.0")
-PORT = int(os.environ.get("A2A_PORT", 9999))
+HOST = os.environ.get("A2A_HOST", "127.0.0.1")
+PORT_DATA = int(os.environ.get("A2A_DATA_PORT", 9999))
+PORT_SOLVER = int(os.environ.get("A2A_SOLVER_PORT", 9998))
 
-# Choose which agent to run (for demo, just data_agent)
-AGENT_TYPE = os.environ.get("A2A_AGENT_TYPE", "data")  # "data" or "solver"
+AGENT_TYPE = os.environ.get("A2A_AGENT_TYPE")  # "data", "solver", or None
+
+httpx_client = httpx.AsyncClient()
+
+def make_app(executor, get_agent_card, host, port):
+    return A2AStarletteApplication(
+        http_handler=DefaultRequestHandler(
+            agent_executor=executor,
+            task_store=InMemoryTaskStore(),
+            push_notifier=InMemoryPushNotifier(httpx_client)
+        ),
+        agent_card=get_agent_card(host, port)
+    )
+
+def run_uvicorn(app, host, port, agent_name):
+    print(f"Starting {agent_name} on {host}:{port}")
+    uvicorn.run(app.build(), host=host, port=port)
 
 if AGENT_TYPE == "data":
-    executor = DataAgentExecutor()
-    get_agent_card = get_data_agent_card
-    skills = [data_skill]
-    agent_name = "Data Agent"
+    app = make_app(DataAgentExecutor(), get_data_agent_card, HOST, PORT_DATA)
+    run_uvicorn(app, HOST, PORT_DATA, "Data Agent")
+elif AGENT_TYPE == "solver":
+    app = make_app(ProblemSolverAgentExecutor(), get_problem_solver_agent_card, HOST, PORT_SOLVER)
+    run_uvicorn(app, HOST, PORT_SOLVER, "Problem Solver Agent")
 else:
-    executor = ProblemSolverAgentExecutor()
-    get_agent_card = get_problem_solver_agent_card
-    skills = [solver_skill]
-    agent_name = "Problem Solver Agent"
+    # Run both agents at once in separate threads
+    data_app = make_app(DataAgentExecutor(), get_data_agent_card, HOST, PORT_DATA)
+    solver_app = make_app(ProblemSolverAgentExecutor(), get_problem_solver_agent_card, HOST, PORT_SOLVER)
 
-# Set up the A2A app
-app = A2AStarletteApplication(
-    request_handler=DefaultA2ARequestHandler(executor=executor),
-    task_store=InMemoryTaskStore(),
-    get_agent_card=lambda: get_agent_card(HOST, PORT),
-    skills=skills,
-)
-
-if __name__ == "__main__":
-    print(f"Starting {agent_name} on {HOST}:{PORT}")
-    uvicorn.run(app, host=HOST, port=PORT) 
+    t1 = threading.Thread(target=run_uvicorn, args=(data_app, HOST, PORT_DATA, "Data Agent"), daemon=True)
+    t2 = threading.Thread(target=run_uvicorn, args=(solver_app, HOST, PORT_SOLVER, "Problem Solver Agent"), daemon=True)
+    t1.start()
+    t2.start()
+    print(f"Both agents are running: Data Agent on {HOST}:{PORT_DATA}, Problem Solver Agent on {HOST}:{PORT_SOLVER}")
+    t1.join()
+    t2.join() 
