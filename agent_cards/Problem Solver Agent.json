@@ -1,0 +1,36 @@
+{
+  "capabilities": {
+    "pushNotifications": false,
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text/plain"
+  ],
+  "description": "AI-powered problem-solving agent using Google ADK and OpenAI models via LiteLLM with multiple solution approaches.",
+  "name": "Advanced Problem Solver Agent",
+  "skills": [
+    {
+      "description": "Analyzes complex problems and generates multiple solution approaches using AI-powered reasoning.",
+      "examples": [
+        "Analyze this optimization problem",
+        "Generate solutions for this algorithm challenge",
+        "Evaluate the quality of this solution approach",
+        "Optimize this solution for better efficiency"
+      ],
+      "id": "solve_problem",
+      "name": "Advanced Problem Solver",
+      "tags": [
+        "problem",
+        "solution",
+        "analysis",
+        "optimization",
+        "algorithm"
+      ]
+    }
+  ],
+  "url": "http://127.0.0.1:9998/",
+  "version": "2.0.0"
+} 

@@ -25,7 +25,10 @@ async def test_agent(base_url: str, test_message: str, agent_label: str):
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     print(f"\n--- Testing {agent_label} at {base_url} ---")
-    async with httpx.AsyncClient() as httpx_client:
+    
+    # Configure httpx client with longer timeouts
+    timeout = httpx.Timeout(120.0, connect=10.0)  # 120 second total timeout, 10 second connect timeout
+    async with httpx.AsyncClient(timeout=timeout) as httpx_client:
         resolver = A2ACardResolver(httpx_client=httpx_client, base_url=base_url)
         try:
             agent_card = await resolver.get_agent_card()
@@ -47,9 +50,14 @@ async def test_agent(base_url: str, test_message: str, agent_label: str):
         request = SendMessageRequest(
             id=str(uuid4()), params=MessageSendParams(**send_message_payload)
         )
-        response = await client.send_message(request)
-        print(f"Response from {agent_label}:")
-        print(response.model_dump(mode='json', exclude_none=True))
+        
+        try:
+            response = await client.send_message(request)
+            print(f"Response from {agent_label}:")
+            print(response.model_dump(mode='json', exclude_none=True))
+        except Exception as e:
+            logger.error(f"Error getting response from {agent_label}: {e}")
+            print(f"Error: {e}")
 
 async def main():
     # Test Data Agent

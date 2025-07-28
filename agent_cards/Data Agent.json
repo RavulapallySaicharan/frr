@@ -9,22 +9,28 @@
   "defaultOutputModes": [
     "text/plain"
   ],
-  "description": "Agent that provides tabular data.",
-  "name": "Data Agent",
+  "description": "AI-powered data processing and analysis agent using Google ADK and OpenAI models via LiteLLM.",
+  "name": "Advanced Data Agent",
   "skills": [
     {
-      "description": "Fetches and returns tabular data.",
+      "description": "Fetches, analyzes, and processes tabular data using AI-powered insights.",
       "examples": [
-        "Get the data table"
+        "Get sample data table",
+        "Analyze this CSV data for trends",
+        "Filter data where value > 50",
+        "Generate correlation analysis"
       ],
       "id": "get_data",
-      "name": "Data Fetcher",
+      "name": "Advanced Data Processor",
       "tags": [
         "data",
-        "table"
+        "table",
+        "analysis",
+        "csv",
+        "insights"
       ]
     }
   ],
   "url": "http://127.0.0.1:9999/",
-  "version": "1.0.0"
+  "version": "2.0.0"
 }
