@@ -1,6 +1,8 @@
 import asyncio
 import os
+import sys
 import json
+import argparse
 import pandas as pd
 from typing import Any, Dict, List, Optional
 from a2a.types import AgentSkill, AgentCard, AgentCapabilities
@@ -10,6 +12,9 @@ from a2a.utils import new_agent_text_message, new_task
 from a2a.types import UnsupportedOperationError, InvalidParamsError, InternalError, TaskState, Part, TextPart
 from a2a.utils.errors import ServerError
 from a2a.server.tasks import TaskUpdater
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore, InMemoryPushNotifier
 import logging
 
 # Google ADK and LiteLLM imports
@@ -19,6 +24,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.genai import types
+import uvicorn
 from my_a2a_agents.config import Config
 
 logger = logging.getLogger(__name__)
@@ -263,3 +269,19 @@ def get_agent_card(host: str, port: int):
         skills=[skill]
     ) 
 
+if __name__ == "__main__":
+    # get the host and port from the command line like --host 0.0.0.0 --port 8000 using argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", type=str, default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000)
+    args = parser.parse_args()
+    host = args.host
+    port = args.port
+    print(f"Running on {host}:{port}")
+    app = A2AStarletteApplication(
+        http_handler=DefaultRequestHandler(
+            agent_executor=DataAgentExecutor(),
+            task_store=InMemoryTaskStore()),
+        agent_card=get_agent_card(host, port)
+    )
+    uvicorn.run(app.build(), host=host, port=port)
