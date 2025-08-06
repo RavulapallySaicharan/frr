@@ -1,0 +1,21 @@
+investment_id,company_name,sector,investment_type,amount_invested,current_value,return_percentage,investment_date
+1,TechCorp Inc,Technology,Equity,1000000,1200000,20.0,2023-01-15
+2,HealthCare Solutions,Healthcare,Venture Capital,500000,750000,50.0,2023-03-20
+3,GreenEnergy Ltd,Energy,Private Equity,2000000,1800000,-10.0,2023-02-10
+4,FinTech Pro,Financial Services,Series A,800000,1200000,50.0,2023-04-05
+5,AI Innovations,Technology,Series B,1500000,2250000,50.0,2023-01-30
+6,MedTech Systems,Healthcare,Equity,1200000,1080000,-10.0,2023-05-12
+7,Cloud Solutions,Technology,Series C,3000000,3600000,20.0,2023-03-25
+8,Retail Plus,Consumer,Private Equity,900000,990000,10.0,2023-06-08
+9,Data Analytics Co,Technology,Series A,600000,900000,50.0,2023-02-28
+10,Pharma Research,Healthcare,Series B,1800000,2340000,30.0,2023-04-15
+11,Smart Grid Tech,Energy,Equity,1100000,1210000,10.0,2023-01-20
+12,Digital Banking,Financial Services,Series A,700000,1050000,50.0,2023-05-30
+13,Robotics Inc,Technology,Venture Capital,400000,600000,50.0,2023-03-10
+14,Biotech Labs,Healthcare,Series C,2500000,2750000,10.0,2023-02-05
+15,Clean Energy Co,Energy,Private Equity,1600000,1440000,-10.0,2023-06-20
+16,Payment Systems,Financial Services,Series B,1300000,1950000,50.0,2023-04-25
+17,Software Solutions,Technology,Equity,950000,1140000,20.0,2023-01-08
+18,Medical Devices,Healthcare,Series A,750000,1125000,50.0,2023-05-15
+19,Wind Power Ltd,Energy,Venture Capital,300000,450000,50.0,2023-03-18
+20,InsurTech Pro,Financial Services,Series C,2200000,2420000,10.0,2023-02-12 

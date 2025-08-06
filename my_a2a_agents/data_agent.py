@@ -19,7 +19,6 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.genai import types
-# import litellm
 from my_a2a_agents.config import Config
 
 logger = logging.getLogger(__name__)
@@ -34,63 +33,59 @@ class DataAgent:
         self.config = Config()
         self.model_name = self.config.LITELLM_MODEL
         self.agent = None
+        self.csv_file_path = "sample_soi_data.csv"
         self._initialize_agent()
     
-    def fetch_csv_data(self, data_source: str, columns: List[str], rows: int) -> str:
-        """Fetch or generate CSV data."""
+    def process_data(self, query: str) -> str:
+        """Process data based on user query."""
         try:
-            if data_source == "sample":
-                # Generate sample data
-                if not columns or len(columns) == 0:
-                    columns = ["id", "name", "value", "category"]
-                
-                import random
-                categories = ["A", "B", "C", "D"]
-                names = ["Item_" + str(i) for i in range(1, rows + 1)]
-                
-                data = []
-                for i in range(rows):
-                    data.append([
-                        i + 1,
-                        names[i],
-                        round(random.uniform(10, 100), 2),
-                        random.choice(categories)
-                    ])
-                
-                df = pd.DataFrame(data, columns=columns)
-                return df.to_csv(index=False)
+            # Check if CSV file exists
+            if not os.path.exists(self.csv_file_path):
+                return f"Error: SOI data file '{self.csv_file_path}' not found"
             
-            elif os.path.exists(data_source):
-                # Read from file
-                df = pd.read_csv(data_source)
-                return df.to_csv(index=False)
+            # Read the SOI CSV data
+            df = pd.read_csv(self.csv_file_path)
             
-            else:
-                return "Error: Data source not found"
-                
-        except Exception as e:
-            logger.error(f"Error fetching data: {e}")
-            return f"Error: {str(e)}"
-    
-    def analyze_data(self, data: str, analysis_type: str) -> str:
-        """Analyze CSV data and provide insights."""
-        try:
-            df = pd.read_csv(pd.StringIO(data))
+            # Process the query
+            query_lower = query.lower()
             
-            if analysis_type == "summary":
-                summary = df.describe()
-                return f"Data Summary:\n{summary.to_string()}"
+            if "total portfolio value" in query_lower or "total value" in query_lower:
+                total_invested = df['amount_invested'].sum()
+                total_current = df['current_value'].sum()
+                total_return = ((total_current - total_invested) / total_invested) * 100
+                return f"Portfolio Summary:\nTotal Invested: ${total_invested:,.2f}\nTotal Current Value: ${total_current:,.2f}\nTotal Return: {total_return:.2f}%"
             
-            elif analysis_type == "statistics":
-                stats = {
-                    "shape": df.shape,
-                    "columns": list(df.columns),
-                    "dtypes": df.dtypes.to_dict(),
-                    "missing_values": df.isnull().sum().to_dict()
-                }
-                return f"Data Statistics:\n{json.dumps(stats, indent=2)}"
+            elif "average return" in query_lower:
+                avg_return = df['return_percentage'].mean()
+                return f"Average Return Percentage: {avg_return:.2f}%"
             
-            elif analysis_type == "correlation":
+            elif "return percentage" in query_lower and "greater" in query_lower:
+                # Extract the percentage value from query
+                import re
+                match = re.search(r'(\d+)%', query)
+                if match:
+                    threshold = float(match.group(1))
+                    filtered_df = df[df['return_percentage'] > threshold]
+                    return f"Investments with return > {threshold}%:\n{filtered_df.to_string(index=False)}"
+                else:
+                    return "Please specify the percentage threshold (e.g., 'greater than 10%')"
+            
+            elif "sector" in query_lower and "group" in query_lower:
+                sector_summary = df.groupby('sector')['amount_invested'].sum().sort_values(ascending=False)
+                return f"Total Investment by Sector:\n{sector_summary.to_string()}"
+            
+            elif "top" in query_lower and "return" in query_lower:
+                # Extract number from query (e.g., "top 5")
+                import re
+                match = re.search(r'top (\d+)', query_lower)
+                if match:
+                    n = int(match.group(1))
+                    top_investments = df.nlargest(n, 'return_percentage')[['company_name', 'sector', 'return_percentage', 'amount_invested', 'current_value']]
+                    return f"Top {n} Investments by Return:\n{top_investments.to_string(index=False)}"
+                else:
+                    return "Please specify the number (e.g., 'top 5')"
+            
+            elif "correlation" in query_lower:
                 numeric_cols = df.select_dtypes(include=['number']).columns
                 if len(numeric_cols) > 1:
                     corr = df[numeric_cols].corr()
@@ -98,69 +93,55 @@ class DataAgent:
                 else:
                     return "Not enough numeric columns for correlation analysis"
             
-            elif analysis_type == "trends":
-                # Simple trend analysis
-                numeric_cols = df.select_dtypes(include=['number']).columns
-                trends = {}
-                for col in numeric_cols:
-                    if len(df[col].dropna()) > 1:
-                        trend = "increasing" if df[col].iloc[-1] > df[col].iloc[0] else "decreasing"
-                        trends[col] = trend
+            elif "statistics" in query_lower or "summary" in query_lower:
+                summary = df.describe()
+                return f"SOI Data Statistics:\n{summary.to_string()}"
+            
+            elif "filter" in query_lower:
+                # Handle filtering by sector
+                if "sector" in query_lower:
+                    sectors = ['Technology', 'Healthcare', 'Energy', 'Financial Services', 'Consumer']
+                    for sector in sectors:
+                        if sector.lower() in query_lower:
+                            filtered_df = df[df['sector'] == sector]
+                            return f"Investments in {sector} sector:\n{filtered_df.to_string(index=False)}"
                 
-                return f"Trend Analysis:\n{json.dumps(trends, indent=2)}"
+                # Handle filtering by investment type
+                elif "investment type" in query_lower or "type" in query_lower:
+                    types = ['Equity', 'Venture Capital', 'Private Equity', 'Series A', 'Series B', 'Series C']
+                    for inv_type in types:
+                        if inv_type.lower() in query_lower:
+                            filtered_df = df[df['investment_type'] == inv_type]
+                            return f"Investments of type {inv_type}:\n{filtered_df.to_string(index=False)}"
+                
+                return "Please specify filter criteria (sector, investment type, etc.)"
             
             else:
-                return "Unknown analysis type"
+                # Default: show all data
+                return f"Portfolio Data:\n{df.to_string(index=False)}"
                 
         except Exception as e:
-            logger.error(f"Error analyzing data: {e}")
-            return f"Error: {str(e)}"
-    
-    def filter_data(self, data: str, column: str, condition: str) -> str:
-        """Filter CSV data based on criteria."""
-        try:
-            df = pd.read_csv(pd.StringIO(data))
-            
-            if column not in df.columns:
-                return f"Error: Column '{column}' not found in data"
-            
-            # Simple filtering logic
-            if ">" in condition:
-                value = float(condition.split(">")[1].strip())
-                filtered_df = df[df[column] > value]
-            elif "<" in condition:
-                value = float(condition.split("<")[1].strip())
-                filtered_df = df[df[column] < value]
-            elif "==" in condition:
-                value = condition.split("==")[1].strip().strip('"')
-                filtered_df = df[df[column] == value]
-            else:
-                return f"Error: Unsupported condition '{condition}'"
-            
-            return filtered_df.to_csv(index=False)
-            
-        except Exception as e:
-            logger.error(f"Error filtering data: {e}")
+            logger.error(f"Error processing data: {e}")
             return f"Error: {str(e)}"
     
     def _initialize_agent(self):
         """Initialize the Google ADK agent with data processing capabilities."""
         try:
-            # Create agent with functions as tools
+            # Create agent with single tool
             self.agent = Agent(
                 name="data_agent",
                 description="Advanced data processing and analysis agent",
-                tools=[self.fetch_csv_data, self.analyze_data, self.filter_data],
+                tools=[self.process_data],
                 model=LiteLlm(model=self.model_name)
             )
-            logger.info("Google ADK agent initialized successfully")
+            logger.info("Google ADK data agent initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize Google ADK agent: {e}")
             raise e
     
     async def invoke(self, query: str, **kwargs) -> Dict[str, Any]:
-        """Process data-related queries using Google ADK agent with Runner pattern."""
+        """Process SOI data queries using Google ADK agent with Runner pattern."""
         try:
             if not query or query.strip() == "":
                 return {
@@ -174,25 +155,20 @@ class DataAgent:
             # Initialize session and artifact services
             session_service = InMemorySessionService()
             artifacts_service = InMemoryArtifactService()
-
-            print(f"Session service: {session_service}")
-            print(f"Artifacts service: {artifacts_service}")
             
             # Create session
             session = await session_service.create_session(
                 state={}, 
-                app_name='data_agent_app', 
+                app_name='data_app', 
                 user_id='user_data'
             )
-            
-            print(f"Session: {session}")
 
             # Create content for the query
             content = types.Content(role='user', parts=[types.Part(text=query)])
             
             # Create runner
             runner = Runner(
-                app_name='data_agent_app',
+                app_name='data_app',
                 agent=self.agent,
                 artifact_service=artifacts_service,
                 session_service=session_service,
@@ -213,11 +189,6 @@ class DataAgent:
                     result_content += str(event.text)
                 elif hasattr(event, 'message') and event.message:
                     result_content += str(event.message)
-            
-            print({
-                "status": "completed",
-                "content": result_content if result_content else "No response generated"
-            })
             
             return {
                 "status": "completed",
