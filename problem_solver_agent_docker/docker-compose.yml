@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  problem-solver-agent:
+    build:
+      context: ..
+      dockerfile: problem_solver_agent_docker/Dockerfile
+    container_name: frr-problem-solver-agent
+    ports:
+      - "8001:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LITELLM_MODEL=${LITELLM_MODEL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

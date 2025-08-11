@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  data-agent:
+    build:
+      context: ..
+      dockerfile: data_agent_docker/Dockerfile
+    container_name: frr-data-agent
+    ports:
+      - "9998:8000"
+    volumes:
+      # Mount the data directory for persistent data
+      - ../data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

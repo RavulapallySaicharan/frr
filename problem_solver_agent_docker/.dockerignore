@@ -1,0 +1,70 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Python cache and virtual environments
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Documentation
+README.md
+README_TEMPLATES.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Docker files
+Dockerfile*
+.dockerignore
+
+# Data files (not needed for problem solver)
+*.csv
+sample_*.csv
+
+# Temporary files
+*.tmp
+*.temp
+
+# Other agent folders
+data_agent_docker/
+problem_solver_agent_docker/ 
